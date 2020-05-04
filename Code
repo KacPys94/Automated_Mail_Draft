@@ -1,0 +1,192 @@
+function onOpen() {
+  //create a menu
+  var ui = SpreadsheetApp.getUi();
+  var menu = ui.createMenu("Send_Mail");
+  menu.addItem("SEND", "connectWithSpreadsheet");  
+  menu.addToUi();
+}
+function connectWithSpreadsheet(){
+  //connect with the main Spreadsheet and Sheet
+  var ss = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  //The part of string that sheet has to have in the name
+  var sheetCon = "Detail";
+  //get current sheet name and compare with pattern
+  //if patern exists in the sheet name - continue, else - return 1
+  var shName = ss.getSheetName();
+  if(shName.indexOf(sheetCon) !== -1)
+  {
+    var test = 1;
+  }
+  else{ 
+    return 1;
+  } 
+  
+  sortTheRange(ss);
+  var l = partnerNoList(ss);
+  var u = getVendor(ss,l);
+  //Logger.log(u);
+}
+function sortTheRange(ss){
+ 
+  //get range of the data, avoid headers
+  var range = ss.getRange(2, 1,ss.getLastRow(),ss.getLastColumn())
+  //sort Partner no column in ascending order then Log column with the same order
+  range.sort([{column: 7, ascending: true}, {column: 16, ascending: true}]);
+  //remove duplicates with duplicated fv numbers
+  //range.removeDuplicates([18]);
+  
+}
+
+function partnerNoList(ss){
+  
+  //get unique Partner No list
+  var partnerList = []; //empty list
+  var partnerRange = ss.getRange(2,7,ss.getLastRow()-1).getValues(); //values from the certain column
+  
+  //transform array elements to string
+  var stringList = new Array();
+  for(var i in partnerRange){
+    for(var j in partnerRange[i]){
+      stringList.push(partnerRange[i].toString());
+    }
+  }
+  //loop through array to find strings which contains "P" letter and replace this string with value from other column
+  for(var i in stringList){
+    if(stringList[i].indexOf("P") > -1){
+      stringList[i] = ss.getRange(parseInt(i)+2,21).getValue(); 
+    }
+    else{
+     stringList[i] = parseInt(stringList[i]);
+    }
+  }
+  
+  for(var i in stringList){
+    var num = parseInt(i); //i is a string, so it has to be changed to intiger in order to numerate over it
+    //if list is empty or last element in the list is different add this number to the list
+    //last item check is enough because the range has been sorted
+    if(partnerList.length == 0 || partnerList[partnerList.length-1] != stringList[num]){
+       partnerList.push(stringList[num]);
+    }
+  } 
+  return partnerList;
+}
+
+//function executes another function to receive error logs and invoice numbers
+//as parameter, sheet and list of Vendor numbers are put
+function getVendor(ss,list){
+ //for each vendor number in the list execute function
+  for(var i=0; i<list.length; i++){
+    getErrors(ss,list[i])
+  }
+  
+}
+
+function getErrors(ss,vendor){
+  var range = ss.getRange(1,7,ss.getLastRow(),15).getValues();
+  var errorsList = new Array(); //array for error log
+  var fvNum = new Array(); //array for invoice numbers
+  var errorGeneral = new Array(); //error log without details
+  for(var i in range){
+    //compare vendor number in the range with given vendor number as parameter
+      if(vendor == range[i][0] || vendor == range[i][14]){
+        //add error log and invoice number to the list
+        errorsList.push(range[i][9]);
+        if(range[i][8] == ""){
+          errorGeneral.push(range[i][9]);
+        }else{
+          errorGeneral.push(range[i][8]);
+        }
+        fvNum.push(range[i][11]);
+      }
+  }
+  
+  var descriptText = getAction(errorGeneral);
+  
+  var text = "<ul>";
+  for (i = 0; i < errorsList.length ; i++) {
+      text += "<li>" + errorsList[i] + ", for fv: <b>" + fvNum[i] + "</b></li>";
+      text2 += "<li>" + descriptText[i] + "</li>";
+  }
+  text += "</ul>";
+  
+  var text2 = "<ul>";
+  for (i = 0; i < descriptText.length ; i++) {
+      text2 += "<li>" + descriptText[i] + "</li>";
+  }
+  text2 += "</ul>";
+  
+  if(descriptText.length == 0){
+    var body = "<p>Dear supplier, " + "</p>" +  
+             "<p></n></p>" +
+             "<p>Some of the EDI IDocs we received from you contain error.</p>" + 
+               "<p>Please correct it and resend this messages. </p>" + 
+               "<p>Below you can find error logs and fv numbers. </p>" +text + "</p>" +
+             "<p><br></p>";
+  }else{
+    var body = "<p>Dear supplier, " + "</p>" +  
+             "<p></n></p>" +
+             "<p>Some of the EDI IDocs we received from you contain error.</p>" + 
+               "<p>Please correct it and resend this messages. </p>" + 
+               "<p>Below you can find error logs and fv numbers. </p>" +text + "</p>" +
+               "<p>Please find also attached a list of actions to be maintained: " + text2 + "</p>"+
+             "<p><br></p>";
+  }
+              
+try{
+  GmailApp.createDraft('kacper.pysniak.ext@valeo.com',vendor + ': EDI Errors ',"x", {htmlBody: body});
+}catch(e){
+   console.error('GmailApp yielded an error: ' + e);
+   GmailApp.createDraft("kacper.pysniak@valeo.com","Error handler","404");
+}
+}
+
+function getAction(errorGeneral){
+ 
+  var ss = SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1ZEhSi4-RW8ToTBVkQeSRPpsY2RyL0QDJhOvwetRbXNs/edit#gid=0").getSheets()[0];
+  var data = ss.getRange(1,3,ss.getLastRow(),4).getValues();
+  
+  var description = new Array();
+  
+  var x = 0;
+  
+  while(x<errorGeneral.length){
+    for(var i in data){
+      for(var j=0 in data[i]){
+        if((errorGeneral[x] == data[i][j] || errorGeneral[x] == data[i][parseInt(j)+1]) && ss.getRange(parseInt(i)+1,8).getValue() !== "")
+        {
+          description.push(data[i][3]);
+        }
+      }
+    }
+    x++;
+  }
+  
+  //remove duplicates of messages
+  var noDuplicates = new Array();
+  for(var i in description){
+    if(!(noDuplicates.includes(description[i]))) //if array doesn't include unique log, add to the array
+    {
+      noDuplicates.push(description[i]);
+    }
+  }
+  
+  return noDuplicates;
+}
+//get source data for certain pivot
+//var x = ss.getPivotTables()[0].getSourceDataRange().getDisplayValues();
+
+function xxxxx(){
+ 
+  class User {
+
+  constructor(name) {
+    this.name = name;
+  }
+
+}
+
+// Usage:
+let user = new User("John");
+Logger.log(user);
+  
+}
