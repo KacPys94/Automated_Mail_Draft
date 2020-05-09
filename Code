@@ -131,18 +131,23 @@ function getErrors(ss,vendor){
                "<p>Please find also attached a list of actions to be maintained: " + text2 + "</p>"+
              "<p><br></p>";
   }
+
+//returns active user
+var email = Session.getActiveUser().getEmail();
               
+//try block to create draft on active user mail              
 try{
-  GmailApp.createDraft('kacper.pysniak.ext@valeo.com',vendor + ': EDI Errors ',"x", {htmlBody: body});
+  GmailApp.createDraft(email,vendor + ': EDI Errors ',"x", {htmlBody: body});
 }catch(e){
    console.error('GmailApp yielded an error: ' + e);
-   GmailApp.createDraft("kacper.pysniak@valeo.com","Error handler","404");
+   GmailApp.createDraft(email,"Error handler","404");
 }
 }
 
 function getAction(errorGeneral){
  
-  var ss = SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1ZEhSi4-RW8ToTBVkQeSRPpsY2RyL0QDJhOvwetRbXNs/edit#gid=0").getSheets()[0];
+ //Provide Spreadsheet with error data
+  var ss = SpreadsheetApp.openByUrl("htttp://").getSheets()[0];
   var data = ss.getRange(1,3,ss.getLastRow(),4).getValues();
   
   var description = new Array();
@@ -174,19 +179,3 @@ function getAction(errorGeneral){
 }
 //get source data for certain pivot
 //var x = ss.getPivotTables()[0].getSourceDataRange().getDisplayValues();
-
-function xxxxx(){
- 
-  class User {
-
-  constructor(name) {
-    this.name = name;
-  }
-
-}
-
-// Usage:
-let user = new User("John");
-Logger.log(user);
-  
-}
